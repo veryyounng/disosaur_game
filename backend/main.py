@@ -53,3 +53,7 @@ def move():
     return {"status": "ok", "snake": SNAKE}
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
