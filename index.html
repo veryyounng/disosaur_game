@@ -7,7 +7,7 @@
       body {
         margin: 0;
         padding: 0;
-        background-color: #fff8dc; /* 파스텔톤 노랑 */
+        background-color: #fff8dc;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         display: flex;
         flex-direction: column;
@@ -18,45 +18,59 @@
 
       h1 {
         color: #444;
-        margin-bottom: 40px;
+        margin-bottom: 20px;
+      }
+
+      .cake-container {
+        position: relative;
+      }
+
+      .cake-img {
+        width: 500px;
+        height: 500px;
+        object-fit: cover;
       }
 
       .button {
-        text-decoration: none;
-        display: block;
-        margin: 15px;
+        position: absolute;
         padding: 15px 30px;
         font-size: 20px;
         border: none;
         border-radius: 30px;
         cursor: pointer;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s;
-      }
-
-      .button:hover {
-        transform: scale(1.05);
+        text-decoration: none;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        /* hover 효과 제거로 transition도 삭제 가능 */
       }
 
       .white {
         background-color: white;
         color: #444;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
       }
 
       .sky {
-        background-color: #b3e5fc; /* 파스텔 하늘색 */
+        background-color: #b3e5fc;
         color: #003f5c;
+        top: 55%;
+        left: 50%;
+        transform: translate(-50%, -50%);
       }
     </style>
   </head>
   <body>
-    <h1>🎮 최소영 미니게임 🎮</h1>
+    <h1>최소영 미니게임</h1>
 
-    <a href="https://game-steel-beta.vercel.app/" class="button white"
-      >틱택토 게임</a
-    >
-    <a href="https://disosaur-game.onrender.com/" class="button sky"
-      >공룡게임</a
-    >
+    <div class="cake-container">
+      <img src="cake.jpg" alt="케이크" class="cake-img" />
+      <a href="https://game-steel-beta.vercel.app/" class="button white"
+        >틱택토</a
+      >
+      <a href="https://disosaur-game.onrender.com/" class="button sky"
+        >공룡게임</a
+      >
+    </div>
   </body>
 </html>
