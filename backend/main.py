@@ -32,7 +32,7 @@ DIR_MAP = {
 DIRECTION = DIR_MAP["right"]  # 시작 방향
 
 # 스네이크, 벽, 사과
-SNAKE = [[1, 1]]  # 머리만 1칸으로 시작
+SNAKE = [[0, 0]]  # 머리만 1칸으로 시작
 WALLS = []        # [(x,y), ...]
 APPLE = None      # (x,y)
 
