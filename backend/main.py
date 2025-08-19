@@ -50,7 +50,7 @@ def random_empty_cell(excludes: set[tuple[int, int]]) -> tuple[int, int]:
 def reset_game():
     global SNAKE, WALLS, DIRECTION, APPLE, GAME_OVER
     DIRECTION = DIR_MAP["right"]
-    SNAKE = [[1, 1]]
+    SNAKE = [[0, 0]]
     WALLS = []
     GAME_OVER = False  # ✅ 리셋 시 게임오버 해제
 
