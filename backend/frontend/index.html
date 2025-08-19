@@ -60,8 +60,31 @@
     <div id="container">
       <h1>🦖미니 공룡게임🦖</h1>
       <button onclick="move()">➡️ 앞으로 이동</button>
+      <div style="margin-top: 10px">
+        <button onclick="resetGame()">🔄 게임 초기화</button>
+      </div>
+
       <div id="log"></div>
       <div id="board"></div>
+    </div>
+
+    <div style="margin-top: 20px; text-align: center">
+      <div style="font-weight: bold; font-size: 18px; margin-bottom: 8px">
+        🔀 방향 전환키
+      </div>
+      <div
+        style="
+          display: grid;
+          grid-template-columns: repeat(2, auto);
+          gap: 10px;
+          justify-content: center;
+        "
+      >
+        <button onclick="changeDir('up')">⬆️</button>
+        <button onclick="changeDir('down')">⬇️</button>
+        <button onclick="changeDir('left')">⬅️</button>
+        <button onclick="changeDir('right')">➡️</button>
+      </div>
     </div>
 
     <script>
@@ -82,12 +105,33 @@
         });
       }
 
+      async function resetGame() {
+        const res = await fetch('/api/reset', { method: 'POST' });
+        const data = await res.json();
+        document.getElementById('log').textContent =
+          '🧼 게임이 초기화되었어요!';
+        renderBoard();
+      }
+
       async function move() {
         const res = await fetch('/api/move', { method: 'POST' });
         const data = await res.json();
         document.getElementById('log').textContent =
           data.status === 'crash' ? '💥 충돌했어요!' : '🦕 이동 완료!';
         renderBoard();
+      }
+
+      async function changeDir(dir) {
+        const res = await fetch('/api/change_direction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ direction: dir }),
+        });
+        const data = await res.json();
+        document.getElementById('log').textContent =
+          data.status === 'ok'
+            ? `🔄 방향을 ${dir.toUpperCase()}로 변경!`
+            : '❌ 방향 설정 실패';
       }
 
       renderBoard();
