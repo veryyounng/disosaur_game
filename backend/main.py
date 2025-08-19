@@ -18,6 +18,9 @@ app.add_middleware(
 # ====== 게임 전역 상태 ======
 BOARD_SIZE = 5
 N_WALLS = 3
+GOAL = (4, 4)           # ✅ 목표 지점 (x=4, y=4)
+GAME_OVER = False       # ✅ 게임 종료 상태
+
 
 # 방향 벡터
 DIR_MAP = {
@@ -45,14 +48,16 @@ def random_empty_cell(excludes: set[tuple[int, int]]) -> tuple[int, int]:
     return random.choice(candidates)
 
 def reset_game():
-    global SNAKE, WALLS, DIRECTION, APPLE
+    global SNAKE, WALLS, DIRECTION, APPLE, GAME_OVER
     DIRECTION = DIR_MAP["right"]
-    SNAKE = [[1, 1]]  # (1,1)에서 시작
+    SNAKE = [[1, 1]]
     WALLS = []
+    GAME_OVER = False  # ✅ 리셋 시 게임오버 해제
 
     occupied = {(x, y) for (x, y) in SNAKE}
+    occupied.add(GOAL)  # ✅ 집 위치엔 아무것도 생성하지 않기
 
-    # 랜덤 벽 생성
+    # 랜덤 벽 생성 (집/뱀 제외)
     tries = 0
     while len(WALLS) < N_WALLS and tries < 200:
         x = random.randint(0, BOARD_SIZE - 1)
@@ -62,9 +67,8 @@ def reset_game():
             occupied.add((x, y))
         tries += 1
 
-    # 사과 생성
-    apple = random_empty_cell(occupied)
-    APPLE = apple
+    # 사과도 집/뱀/벽 제외
+    APPLE = random_empty_cell(occupied)
 
 def opposite(a: tuple[int,int], b: tuple[int,int]) -> bool:
     # 정반대 방향인지 체크
@@ -78,6 +82,28 @@ class DirectionRequest(BaseModel):
     direction: str
 
 # ====== API ======
+def reset_game():
+    global SNAKE, WALLS, DIRECTION, APPLE, GAME_OVER
+    DIRECTION = DIR_MAP["right"]
+    SNAKE = [[1, 1]]
+    WALLS = []
+    GAME_OVER = False  # ✅ 리셋 시 게임오버 해제
+
+    occupied = {(x, y) for (x, y) in SNAKE}
+    occupied.add(GOAL)  # ✅ 집 위치엔 아무것도 생성하지 않기
+
+    # 랜덤 벽 생성 (집/뱀 제외)
+    tries = 0
+    while len(WALLS) < N_WALLS and tries < 200:
+        x = random.randint(0, BOARD_SIZE - 1)
+        y = random.randint(0, BOARD_SIZE - 1)
+        if (x, y) not in occupied and (x, y) not in WALLS:
+            WALLS.append((x, y))
+            occupied.add((x, y))
+        tries += 1
+
+    # 사과도 집/뱀/벽 제외
+    APPLE = random_empty_cell(occupied)
 @app.get("/api/state")
 def get_state():
     board = [["" for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
@@ -85,6 +111,10 @@ def get_state():
     # 벽
     for (wx, wy) in WALLS:
         board[wy][wx] = "🧱"
+
+    # 집(목표)
+    gx, gy = GOAL
+    board[gy][gx] = "🏠"
 
     # 사과
     if APPLE is not None:
@@ -101,6 +131,8 @@ def get_state():
         "apple": APPLE,
         "walls": WALLS,
         "direction": DIRECTION,
+        "goal": GOAL,
+        "game_over": GAME_OVER,
     }
 
 @app.post("/api/reset")
@@ -111,13 +143,13 @@ def reset():
 @app.post("/api/change_direction")
 def change_direction(req: DirectionRequest):
     global DIRECTION
+    if GAME_OVER:  # ✅ 종료 후 입력 무시(프론트는 메시지로 처리)
+        return {"status": "finished"}
+
     d = req.direction.lower()
     if d not in DIR_MAP:
         return {"status": "invalid", "reason": "unknown direction"}
-
     new_dir = DIR_MAP[d]
-
-    # 길이가 2칸 이상일 때 정반대 방향으로 꺾는 것(즉시 U턴) 금지
     if len(SNAKE) >= 2 and opposite(new_dir, DIRECTION):
         return {"status": "invalid", "reason": "opposite turn not allowed"}
 
@@ -126,13 +158,10 @@ def change_direction(req: DirectionRequest):
 
 @app.post("/api/move")
 def move():
-    """
-    이동 규칙:
-    1) 새 머리 = 현 머리 + 방향벡터
-    2) 충돌 체크(벽/경계/자기몸). 단, '꼬리칸으로 이동'은 이번 턴에 꼬리가 빠지면 허용.
-    3) 사과면 성장(꼬리 유지) + 새 사과 생성, 아니면 일반 이동(꼬리 제거)
-    """
-    global SNAKE, APPLE
+    global SNAKE, APPLE, GAME_OVER
+
+    if GAME_OVER:  # ✅ 종료 후 이동 무시
+        return {"status": "finished", "game_over": True}
 
     dx, dy = DIRECTION
     head_x, head_y = SNAKE[0]
@@ -140,29 +169,40 @@ def move():
 
     # 경계/벽 충돌
     if not in_bounds(nx, ny) or (nx, ny) in WALLS:
-        return {"status": "crash"}
+        GAME_OVER = True
+        return {"status": "crash", "game_over": True}
+
+    # ✅ 목표 도달 체크 (먹이 처리보다 선행)
+    if (nx, ny) == GOAL:
+        SNAKE = [[nx, ny]] + SNAKE[:-1] if len(SNAKE) > 0 else [[nx, ny]]
+        GAME_OVER = True
+        return {
+            "status": "goal",
+            "game_over": True,
+            "snake": SNAKE,
+            "apple": APPLE,
+        }
 
     will_grow = (APPLE is not None and (nx, ny) == APPLE)
 
-    # 자기충돌 체크: 이번에 꼬리가 빠질 경우, 꼬리 위치로의 이동은 허용
+    # 자기충돌(꼬리 빠질 예외 허용)
     body_set = set(map(tuple, SNAKE))
     tail = tuple(SNAKE[-1])
-    if (nx, ny) in body_set:
-        if not (not will_grow and (nx, ny) == tail):
-            return {"status": "crash"}
+    if (nx, ny) in body_set and not (not will_grow and (nx, ny) == tail):
+        GAME_OVER = True
+        return {"status": "crash", "game_over": True}
 
     new_head = [nx, ny]
     if will_grow:
-        # 성장: 꼬리 유지
         SNAKE = [new_head] + SNAKE
-        # 새 사과 생성
         occupied = set(map(tuple, SNAKE)).union(WALLS)
+        occupied.add(GOAL)  # ✅ 집에는 사과 재생성 금지
         APPLE = random_empty_cell(occupied)
-        return {"status": "ok", "snake": SNAKE, "event": "eat", "apple": APPLE}
+        return {"status": "ok", "event": "eat", "snake": SNAKE, "apple": APPLE}
     else:
-        # 일반 이동: 꼬리 제거
         SNAKE = [new_head] + SNAKE[:-1]
-        return {"status": "ok", "snake": SNAKE, "event": "move", "apple": APPLE}
+        return {"status": "ok", "event": "move", "snake": SNAKE, "apple": APPLE}
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

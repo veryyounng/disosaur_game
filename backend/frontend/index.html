@@ -79,7 +79,7 @@
   <body>
     <div id="container">
       <h1>🦖미니 공룡게임🦖</h1>
-      <button onclick="move()">➡️ 앞으로 이동</button>
+      <button data-role="move" onclick="move()">➡️ 앞으로 이동</button>
       <div>
         <button onclick="resetGame()">🔄 게임 초기화</button>
       </div>
@@ -87,50 +87,93 @@
       <div id="board"></div>
     </div>
 
-    <div style="margin-top: 1.25rem; text-align: center">
-      <div class="direction-title">🔀 방향 전환키</div>
-      <div class="direction-buttons">
-        <button onclick="changeDir('up')">⬆️</button>
-        <button onclick="changeDir('down')">⬇️</button>
-        <button onclick="changeDir('left')">⬅️</button>
-        <button onclick="changeDir('right')">➡️</button>
-      </div>
+    <!-- 방향 전환키 -->
+    <div class="direction-buttons">
+      <button data-role="dir" onclick="changeDir('up')">⬆️</button>
+      <button data-role="dir" onclick="changeDir('down')">⬇️</button>
+      <button data-role="dir" onclick="changeDir('left')">⬅️</button>
+      <button data-role="dir" onclick="changeDir('right')">➡️</button>
     </div>
 
     <script>
-      async function renderBoard() {
-        const res = await fetch('/api/state');
-        const data = await res.json();
-        const board = data.board;
-        const boardDiv = document.getElementById('board');
-        boardDiv.innerHTML = '';
+      function setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      }
 
-        board.forEach((row) => {
-          row.forEach((cell) => {
-            const div = document.createElement('div');
-            div.className = 'cell';
-            div.textContent = cell || '';
-            boardDiv.appendChild(div);
+      function setControlsDisabled(disabled) {
+        document
+          .querySelectorAll('button[data-role="move"], button[data-role="dir"]')
+          .forEach((btn) => (btn.disabled = disabled));
+      }
+
+      async function renderBoard() {
+        try {
+          const res = await fetch('/api/state');
+
+          // 404/500 방어
+          if (!res.ok) {
+            const txt = await res.text();
+            console.error('GET /api/state failed:', res.status, txt);
+            setText('log', `❗API 오류: /api/state ${res.status}`);
+            return;
+          }
+
+          const data = await res.json();
+          if (!data || !Array.isArray(data.board)) {
+            console.error('Invalid state payload:', data);
+            setText('log', '❗API 응답 형식 오류');
+            return;
+          }
+
+          // 종료 시 컨트롤 비활성화
+          setControlsDisabled(!!data.game_over);
+
+          const boardDiv = document.getElementById('board');
+          if (!boardDiv) {
+            console.error('#board not found in DOM');
+            return;
+          }
+
+          boardDiv.innerHTML = '';
+          data.board.forEach((row) => {
+            row.forEach((cell) => {
+              const div = document.createElement('div');
+              div.className = 'cell';
+              div.textContent = cell || '';
+              boardDiv.appendChild(div);
+            });
           });
-        });
+        } catch (e) {
+          console.error('renderBoard error:', e);
+          setText('log', '❗렌더링 에러');
+        }
       }
 
       async function resetGame() {
-        const res = await fetch('/api/reset', { method: 'POST' });
-        await res.json();
-        document.getElementById('log').textContent =
-          '🧼 게임이 초기화되었어요!';
+        await fetch('/api/reset', { method: 'POST' });
+        setText('log', '🧼 게임이 초기화되었어요!');
+        setControlsDisabled(false);
         renderBoard();
       }
 
       async function move() {
         const res = await fetch('/api/move', { method: 'POST' });
         const data = await res.json();
+
         if (data.status === 'crash') {
-          document.getElementById('log').textContent = '💥 충돌했어요!';
+          setText('log', '💥 충돌했어요!');
+          setControlsDisabled(true);
+        } else if (data.status === 'goal') {
+          setText('log', '🏁 공룡이 무사히 도착했어요!');
+          setControlsDisabled(true);
+        } else if (data.status === 'finished') {
+          setControlsDisabled(true);
         } else {
-          document.getElementById('log').textContent =
-            data.event === 'eat' ? '🍎 냠! 길이가 늘었어요!' : '🦕 이동 완료!';
+          setText(
+            'log',
+            data.event === 'eat' ? '🍎 냠! 길이가 늘었어요!' : '🦕 이동 완료!'
+          );
         }
         renderBoard();
       }
@@ -142,13 +185,17 @@
           body: JSON.stringify({ direction: dir }),
         });
         const data = await res.json();
-        document.getElementById('log').textContent =
-          data.status === 'ok'
-            ? `🔄 방향을 ${dir.toUpperCase()}로 변경!`
-            : '❌ 반대 방향으로는 즉시 회전할 수 없어요';
+
+        if (data.status === 'ok') {
+          setText('log', `🔄 방향을 ${dir.toUpperCase()}로 변경!`);
+        } else if (data.status === 'finished') {
+          setControlsDisabled(true);
+        } else {
+          setText('log', '❌ 반대 방향으로는 즉시 회전할 수 없어요');
+        }
       }
 
-      renderBoard();
+      document.addEventListener('DOMContentLoaded', renderBoard);
     </script>
   </body>
 </html>
