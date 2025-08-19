@@ -117,7 +117,7 @@
 
       async function resetGame() {
         const res = await fetch('/api/reset', { method: 'POST' });
-        const data = await res.json();
+        await res.json();
         document.getElementById('log').textContent =
           '🧼 게임이 초기화되었어요!';
         renderBoard();
@@ -126,8 +126,12 @@
       async function move() {
         const res = await fetch('/api/move', { method: 'POST' });
         const data = await res.json();
-        document.getElementById('log').textContent =
-          data.status === 'crash' ? '💥 충돌했어요!' : '🦕 이동 완료!';
+        if (data.status === 'crash') {
+          document.getElementById('log').textContent = '💥 충돌했어요!';
+        } else {
+          document.getElementById('log').textContent =
+            data.event === 'eat' ? '🍎 냠! 길이가 늘었어요!' : '🦕 이동 완료!';
+        }
         renderBoard();
       }
 
@@ -141,7 +145,7 @@
         document.getElementById('log').textContent =
           data.status === 'ok'
             ? `🔄 방향을 ${dir.toUpperCase()}로 변경!`
-            : '❌ 방향 설정 실패';
+            : '❌ 반대 방향으로는 즉시 회전할 수 없어요';
       }
 
       renderBoard();
